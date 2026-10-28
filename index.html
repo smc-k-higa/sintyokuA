@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>城北シールド 掘進進捗</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body {
+    height: 100%;
+    margin: 0;
+    font-family: "Hiragino Sans", "Meiryo", sans-serif;
+    background:#f4f6f8;
+  }
+  body {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .container {
+    width: 100%;
+    max-width: 1600px;
+    padding: 2vh 4vw;
+  }
+  h1 {
+    color:#2c3e50;
+    font-size: clamp(28px, 4vw, 56px);
+    margin: 0 0 2vh 0;
+    text-align: center;
+  }
+  .card {
+    background:#fff;
+    border-radius: 16px;
+    padding: 4vh 5vw;
+    box-shadow:0 4px 16px rgba(0,0,0,0.12);
+  }
+  .card h3 {
+    margin-top:0;
+    margin-bottom: 1vh;
+    font-size: clamp(20px, 2.2vw, 32px);
+    color:#2c3e50;
+  }
+
+  /* ▼ 日付表記 */
+  .date-label {
+    font-size: clamp(16px, 1.8vw, 26px);
+    color:#555;
+    margin-bottom: 3vh;
+    font-weight:bold;
+  }
+
+  .stats {
+    display:flex;
+    justify-content:space-around;
+    margin-bottom: 4vh;
+    flex-wrap:wrap;
+    gap: 2vw;
+  }
+  .stat-box { text-align:center; flex:1; min-width:200px; }
+  .stat-box .num {
+    font-size: clamp(48px, 7vw, 100px);
+    font-weight:bold;
+    color:#2c3e50;
+    line-height: 1.1;
+  }
+  .stat-box .label {
+    font-size: clamp(16px, 1.6vw, 24px);
+    color:#777;
+    margin-top: 0.5vh;
+  }
+
+  .progress-wrap {
+    background:#e0e0e0;
+    border-radius: 20px;
+    height: clamp(32px, 4.5vh, 56px);
+    overflow:hidden;
+  }
+  .progress-bar {
+    height:100%;
+    background:linear-gradient(90deg,#3498db,#2ecc71);
+    color:#fff;
+    text-align:center;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    font-weight:bold;
+    font-size: clamp(16px, 2vw, 28px);
+    transition: width 0.6s ease;
+  }
+
+  .status-msg {
+    font-size: clamp(12px, 1.1vw, 16px);
+    color:#888;
+    margin-top: 1.5vh;
+    text-align:right;
+  }
+  .status-msg.error { color:#e74c3c; }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>🚧 城北シールド 掘進進捗</h1>
+
+  <div class="card">
+    <h3>シールド進捗</h3>
+    <div class="date-label" id="dateLabel">-年-月-日現在</div>
+
+    <div class="stats">
+      <div class="stat-box"><div class="num" id="distNow">-</div><div class="label">掘進距離(m)</div></div>
+      <div class="stat-box"><div class="num" id="distTotal">-</div><div class="label">全長(m)</div></div>
+    </div>
+
+    <div class="progress-wrap">
+      <div class="progress-bar" id="progressBar" style="width:0%;">0%</div>
+    </div>
+
+    <div class="status-msg" id="statusMsg">データ取得中...</div>
+  </div>
+</div>
+
+<script>
+  const CONFIG = {
+    distTotal: 1600
+  };
+
+  const GAS_API_URL =
+    "https://script.google.com/macros/s/AKfycbzt5C7cCo3mDLYYNGK8dBCZLHeRTPFKaVV79bccv2Od_ChVDRnW7MMZZTHriKNj2BOj/exec";
+
+  function renderProgress(distNow) {
+    const distTotal = CONFIG.distTotal;
+    const percent = (distNow / distTotal) * 100;
+
+    document.getElementById('progressBar').style.width = Math.round(percent) + '%';
+    document.getElementById('progressBar').textContent = Math.round(percent) + '%';
+    document.getElementById('distNow').textContent = distNow;
+    document.getElementById('distTotal').textContent = distTotal;
+  }
+
+  function formatDateLabel(dateStr) {
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return dateStr + " 現在";
+
+    const y = d.getFullYear();
+    const m = d.getMonth() + 1;
+    const day = d.getDate();
+    return `${y}年${m}月${day}日現在`;
+  }
+
+  async function fetchLatestDistance() {
+    const res = await fetch(GAS_API_URL, { cache: "no-store" });
+    if (!res.ok) throw new Error("取得失敗: " + res.status);
+    const json = await res.json();
+
+    const distNow = Number(json.distance);
+    if (isNaN(distNow)) throw new Error("距離の値が数値ではありません");
+
+    return { distNow, dateLabel: json.date };
+  }
+
+  function updateStatus(msg, isError) {
+    const el = document.getElementById('statusMsg');
+    el.textContent = msg;
+    el.classList.toggle('error', !!isError);
+  }
+
+  async function init() {
+    try {
+      const { distNow, dateLabel } = await fetchLatestDistance();
+      renderProgress(distNow);
+      document.getElementById('dateLabel').textContent = formatDateLabel(dateLabel);
+      updateStatus("取得成功");
+    } catch (err) {
+      console.error(err);
+      renderProgress(0);
+      updateStatus("データ取得に失敗しました。GASのデプロイ設定を確認してください。", true);
+    }
+  }
+
+  init();
+  setInterval(init, 5 * 60 * 1000);
+</script>
+</body>
+</html>
